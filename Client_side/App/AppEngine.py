@@ -176,7 +176,7 @@ class AppEngine:
         self.add_entity(self.player)
 
         # Load and display stories from the client
-        #self.load_stories()
+        self.load_stories()
 
     def load_stories(self):
         """Load and place stories on the map with specific positions"""

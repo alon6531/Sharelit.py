@@ -144,29 +144,38 @@ class Server:
         """
         Handle the request for stories from the client using UDP.
         """
-        response, client_address = self.udp_socket.recvfrom(1024)
-        print("Sending stories to client via UDP...")
-        titles, contents, usernames, pos_x, pos_y = self.json_data_base.receive_data()
+        try:
+            response, client_address = self.udp_socket.recvfrom(1024)
+            print("Sending stories to client via UDP...")
 
-        # Create a dictionary to hold all the data
-        data = {
-            "titles": titles,
-            "contents": contents,
-            "usernames": usernames,
-            "pos_x": pos_x,
-            "pos_y": pos_y
-        }
+            # קבלת הנתונים ממסד הנתונים
+            try:
+                titles, contents, usernames, pos_x, pos_y = self.json_data_base.receive_data()
+            except Exception as e:
+                print(f"Error retrieving data from database: {e}")
+                return
 
-        # Convert the dictionary to a JSON string
-        json_data = json.dumps(data)
+            # יצירת מילון עם הנתונים
+            data = {
+                "titles": titles or [],
+                "contents": contents or [],
+                "usernames": usernames or [],
+                "pos_x": pos_x or [],
+                "pos_y": pos_y or []
+            }
 
-        # Create a UDP socket
-        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # המרת המידע למחרוזת JSON
+            json_data = json.dumps(data)
 
-        # Send the JSON data to the client
-        udp_socket.sendto(json_data.encode('utf-8'), client_address)
+            # שליחת הנתונים דרך הסוקט הראשי
+            self.udp_socket.sendto(json_data.encode('utf-8'), client_address)
 
-        print("Stories sent successfully via UDP.")
+            print("Stories sent successfully via UDP.")
+
+        except socket.error as e:
+            print(f"Socket error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
     def handle_register(self, client_socket):
         """
