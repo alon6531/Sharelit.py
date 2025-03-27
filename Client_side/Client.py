@@ -9,7 +9,7 @@ from Client_side.App.User import User
 import json
 
 class Client:
-    def __init__(self, server_host='192.168.1.148', server_port=65432):
+    def __init__(self, server_host='192.168.1.217', server_port=65432):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
