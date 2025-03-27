@@ -11,7 +11,7 @@ import threading
 
 
 class Client:
-    def __init__(self, server_host='192.168.1.217', tcp_port=65432, udp_port=12345):
+    def __init__(self, server_host='192.168.1.212', tcp_port=65432, udp_port=12345):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
@@ -122,23 +122,39 @@ class Client:
         # Return the extracted data as arrays
         return titles, contents, usernames, pos_x, pos_y
 
-
     def update_player(self, pos_x, pos_y):
         try:
+            # First, send an initial 'update_player' request to indicate the intention to update
             self.udp_socket.sendto(b'update_player', (self.server_host, self.udp_port))
+
+            # Wait for server acknowledgment (ACK)
             try:
                 response, _ = self.udp_socket.recvfrom(1024)
+                if response != b'ACK':
+                    print("Expected ACK response, but received:", response)
+                    return
             except socket.timeout:
                 print("UDP response timed out")
                 return
+
+            # Send the player data in JSON format (username, pos_x, pos_y)
             data = {
-                'username': self.username,
+                'username': self.username,  # Assumes 'self.username' is already set
                 'pos_x': pos_x,
                 'pos_y': pos_y
             }
             json_data = json.dumps(data)
-            print("Updating player")
+
+            # Send the actual player update message
             self.udp_socket.sendto(json_data.encode(), (self.server_host, self.udp_port))
+            print(f"Sent update for player {self.username}: x={pos_x}, y={pos_y}")
+
+            # Wait for a success response from the server
+            try:
+                response, _ = self.udp_socket.recvfrom(1024)
+                print("Server response:", response.decode('utf-8'))
+            except socket.timeout:
+                print("UDP response timed out after sending player data.")
         except Exception as e:
             print(f"Error updating player position: {e}")
 
@@ -146,17 +162,37 @@ class Client:
         try:
             # Send request to the server for all players' data
             self.udp_socket.sendto(b'send_all_players', (self.server_host, self.udp_port))
-            response, _ = self.udp_socket.recvfrom(1024)
-            # Receive response data from the server
+            try:
+                response, _ = self.udp_socket.recvfrom(1024)
+                if response != b'ACK':
+                    print("Expected ACK response, but received:", response)
+                    return
+            except socket.timeout:
+                print("UDP response timed out")
+                return
+            # Receive player data from the server
             data, _ = self.udp_socket.recvfrom(4096)  # Receiving data from the server
-            print("Received data:", data)  # Debugging line to see the raw data
+            print("Received player data:", data)  # Debugging line to see the raw data
+
+            # Parse the player data (JSON)
             players_data = json.loads(data.decode('utf-8'))
 
             # Extract the number of players and their data
             num_players = players_data["num_players"]
             users = [User(p["username"], p["pos_x"], p["pos_y"]) for p in players_data["players"]]
 
+            # Receive the success message after receiving the player data
+            success_message, _ = self.udp_socket.recvfrom(1024)
+            success_data = json.loads(success_message.decode('utf-8'))
+
+            # Check if the success status is "success"
+            if success_data.get("status") == "success":
+                print("Player data successfully received.")
+            else:
+                print("Error: Player data reception failed.")
+
             return num_players, users
+
         except Exception as e:
             print(f"Error receiving players' data: {e}")
             return 0, []
