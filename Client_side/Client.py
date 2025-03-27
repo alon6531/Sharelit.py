@@ -69,29 +69,6 @@ class Client:
             )
         )
 
-    def listen_udp(self):
-        """
-        Listen for incoming UDP messages (server-side communication).
-        """
-        try:
-            # Set socket option for address reuse
-            self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-            self.udp_socket.bind((self.server_host, self.udp_port))
-            print(f"UDP server listening on {self.server_host}:{self.udp_port}")
-
-            while True:
-                try:
-                    data, addr = self.udp_socket.recvfrom(4096)
-                    print(f"Received message from {addr}: {data.decode('utf-8')}")
-                    # You can add custom handling of different message types here.
-                    # For example, handling specific requests like game data, player updates, etc.
-
-                except Exception as e:
-                    print(f"Error receiving UDP message: {e}")
-        except Exception as e:
-            print(f"Error binding UDP socket: {e}")
-
     def log_in(self, login_username, login_password):
         try:
             self.client_socket.send(b'login')
@@ -149,6 +126,7 @@ class Client:
     def update_player(self, pos_x, pos_y):
         try:
             self.udp_socket.sendto(b'update_player', (self.server_host, self.udp_port))
+            response, _ = self.udp_socket.recvfrom(1024)
             data = {
                 'username': self.username,
                 'pos_x': pos_x,
@@ -164,6 +142,7 @@ class Client:
         try:
             # Send request to the server for all players' data
             self.udp_socket.sendto(b'send_all_players', (self.server_host, self.udp_port))
+            response, _ = self.udp_socket.recvfrom(1024)
             # Receive response data from the server
             data, _ = self.udp_socket.recvfrom(4096)  # Receiving data from the server
             print("Received data:", data)  # Debugging line to see the raw data

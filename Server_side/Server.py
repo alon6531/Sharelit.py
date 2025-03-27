@@ -95,6 +95,7 @@ class Server:
 
                 data, client_address = self.udp_socket.recvfrom(1024)
                 message = data.decode('utf-8')
+                self.udp_socket.sendto(data + b' received', (self.host, self.udp_port))
                 print(f"Received UDP message from {client_address}: {message}")
 
                 if message == "send_all_players":
