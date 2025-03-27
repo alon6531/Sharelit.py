@@ -11,7 +11,7 @@ import threading
 
 
 class Client:
-    def __init__(self, server_host='127.0.0.1', tcp_port=65432, udp_port=12345):
+    def __init__(self, server_host='192.168.1.217', tcp_port=65432, udp_port=12345):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
@@ -51,11 +51,6 @@ class Client:
             print(f"Failed to connect to server: {e}")
             self.udp_socket.close()
             raise
-        # Start UDP server listener in a separate thread
-        self.udp_listener_thread = threading.Thread(target=self.listen_udp)
-        self.udp_listener_thread.daemon = True
-        self.udp_listener_thread.start()
-
         # Initialize the application engine
         self.app_engine = Engine.AppEngine(self)
 
