@@ -11,7 +11,7 @@ import json
 
 
 class Server:
-    def __init__(self, host='127.0.0.1', port=65432):
+    def __init__(self, host='192.168.1.148', port=65432):
         """
         Initialize the Server, generate keys, and start the server socket.
         """
@@ -240,51 +240,37 @@ class Server:
 
     def update_player(self, client_socket):
         """
-        Handle the request to receive the username and position from the client.
+        מקבל מהלקוח את שם המשתמש והמיקום באמצעות JSON.
         """
         try:
-            # Receive the username from the client
-            username = client_socket.recv(1024).decode('utf-8')
-            client_socket.send(b'username sent successfully')  # Send acknowledgment
+            # קבלת נתונים מהלקוח
+            data = client_socket.recv(1024).decode('utf-8')
+            player_data = json.loads(data)
 
+            username = player_data.get("username")
+            pos_x = player_data.get("pos_x")
+            pos_y = player_data.get("pos_y")
 
-            # Receive the x position from the client
-            pos_x = int(client_socket.recv(1024).decode('utf-8'))
-            client_socket.send(b'pos_x sent successfully')  # Send acknowledgment
+            if username is None or pos_x is None or pos_y is None:
+                raise ValueError("Invalid data received")
 
-
-            # Receive the y position from the client
-            pos_y = int(client_socket.recv(1024).decode('utf-8'))
-            client_socket.send(b'pos_y sent successfully')  # Send acknowledgment
-
-
-            # Print or store the received data
             print(f"Received username: {username}, x: {pos_x}, y: {pos_y}")
-            a = True
+
+            # עדכון רשימת השחקנים
             for player in self.players:
                 if player.username == username:
                     player.pos_x = pos_x
                     player.pos_y = pos_y
-                    a = False
                     break
-
-            if a or  len(self.players) == 0:
+            else:
                 self.players.append(User(username, pos_x, pos_y))
 
-
-            for player in self.players:
-                print(f"Player {player.username} updated.")
-
-            # Respond to the client to confirm that the data was received successfully
+            # שליחת אישור ללקוח
             client_socket.send(b"Username and position received successfully.")
-
-
-           # print("\n\n\n " + str(len(self.players)) + "\n\n\n ")
 
         except Exception as e:
             print(f"Error receiving username and position: {e}")
             client_socket.send(b"Error receiving username and position.")
-
     def send_all_players(self, client_socket):
         """
         Sends all players' information (username, pos_x, pos_y) to the client.

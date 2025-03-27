@@ -180,15 +180,26 @@ class AppEngine:
 
     def load_stories(self):
         """Load and place stories on the map with specific positions"""
-        titles, contents, usernames, positions_x, positions_y = self.client.receive_stories()
+        try:
+            stories = self.client.receive_stories()
+            print("Stories received:", stories)  # Debugging line
 
-        for (title, username, content, x, y) in zip(titles, usernames, contents, positions_x, positions_y):
-            print(f"Adding story at position: ({x}, {y})")  # Debugging print for positions
-            story = Story(x, y, 100, 100, (255, 0, 0),
-                          self.reverse_words_and_letters_in_text(f" מאת: {username}") + "\n"
-                          + self.reverse_words_and_letters_in_text(title) + "\n"
-                          + self.reverse_words_and_letters_in_text(content))
-            self.add_entity(story)
+            if not stories:
+                print("No stories received.")
+                return
+
+            titles, contents, usernames, positions_x, positions_y = stories
+
+            for (title, username, content, x, y) in zip(titles, usernames, contents, positions_x, positions_y):
+                print(f"Adding story at position: ({x}, {y})")  # Debugging print for positions
+                story = Story(x, y, 100, 100, (255, 0, 0),
+                              self.reverse_words_and_letters_in_text(f" מאת: {username}") + "\n"
+                              + self.reverse_words_and_letters_in_text(title) + "\n"
+                              + self.reverse_words_and_letters_in_text(content))
+                self.add_entity(story)
+
+        except Exception as e:
+            print("Error while loading stories:", e)
 
 
 
@@ -205,7 +216,7 @@ class AppEngine:
 
 
 
-        if current_time - self.refresh_user >= 10:  # 10 seconds
+        if current_time - self.refresh_user >= 100:  # 10 seconds
             self.client.update_player(self.player.x, self.player.y)
             self.create_player()
             self.refresh_user = current_time
@@ -259,12 +270,15 @@ class AppEngine:
             self.start()
             self.bStart = False
 
-        while self.running:
-            self.handle_events()
-            self.update()
-            self.collide_handle(self.entities)
-            self.render()
-            self.clock.tick(fps)
+        try:
+            while self.running:
+                self.handle_events()
+                self.update()
+                self.collide_handle(self.entities)
+                self.render()
+                self.clock.tick(fps)
+        except Exception as e:
+            print("Unexpected error:", e)
 
         self.status[0] = "Log_In"
         pygame.quit()

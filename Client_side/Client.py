@@ -9,7 +9,7 @@ from Client_side.App.User import User
 import json
 
 class Client:
-    def __init__(self, server_host='127.0.0.1', server_port=65432):
+    def __init__(self, server_host='192.168.1.148', server_port=65432):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
@@ -205,23 +205,25 @@ class Client:
 
     def update_player(self, pos_x, pos_y):
         """
-        Send the username and its position (x, y) to the server.
+        Send the username and its position (x, y) to the server using JSON for faster communication.
+        First, send a simple action message to the server, then the actual data.
         """
         try:
-            # Send the action request to the server
+            # Send an initial action to the server to indicate we are updating player info
             self.client_socket.send(b'update_player')
 
-            # Send the username
-            self.client_socket.send(self.username.encode())
-            self.client_socket.recv(1024)  # Receive acknowledgment
+            # Create a dictionary with the necessary data
+            data = {
+                'username': self.username,
+                'pos_x': int(pos_x),
+                'pos_y': int(pos_y)
+            }
 
-            # Send the x position
-            self.client_socket.send(str(int(pos_x)).encode())
-            self.client_socket.recv(1024)  # Receive acknowledgment
+            # Convert the dictionary to a JSON string
+            json_data = json.dumps(data)
 
-            # Send the y position
-            self.client_socket.send(str(int(pos_y)).encode())
-            self.client_socket.recv(1024)  # Receive acknowledgment
+            # Send the JSON data to the server
+            self.client_socket.send(json_data.encode())
 
             # Receive response from server
             response = self.client_socket.recv(1024).decode('utf-8')
