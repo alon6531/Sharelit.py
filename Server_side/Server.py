@@ -94,6 +94,7 @@ class Server:
             while True:
                 action = client_socket.recv(1024).decode('utf-8')  # Receive the action from the client
                 print(f"Action received: {action}")
+                response =  client_socket.send(f"Action received: {action}".encode('utf-8'))
 
                 if action == 'login':
                     self.handle_login(client_socket)

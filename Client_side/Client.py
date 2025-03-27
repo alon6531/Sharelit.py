@@ -11,7 +11,7 @@ import threading
 
 
 class Client:
-    def __init__(self, server_host='127.0.0.1', tcp_port=65432, udp_port=12345):
+    def __init__(self, server_host='192.168.1.217', tcp_port=65432, udp_port=12345):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
@@ -100,6 +100,7 @@ class Client:
     def log_in(self, login_username, login_password):
         try:
             self.client_socket.send(b'login')
+            response = self.client_socket.recv(1024).decode('utf-8')
             credentials = f"{login_username},{login_password}"
             self.client_socket.send(self.encrypt(credentials))
             response = self.client_socket.recv(1024).decode('utf-8')
@@ -117,6 +118,7 @@ class Client:
     def register(self, user_name, username, password):
         try:
             self.client_socket.send(b'register')
+            response = self.client_socket.recv(1024).decode('utf-8')
             user_data = f"{user_name},{username},{password}"
             self.client_socket.send(self.encrypt(user_data))
             response = self.client_socket.recv(1024).decode('utf-8')
@@ -127,6 +129,7 @@ class Client:
     def receive_stories(self):
         try:
             self.client_socket.send(b'receive_stories')
+            response = self.client_socket.recv(1024).decode('utf-8')
             self.udp_socket.sendto(b'receive_stories_acr', (self.server_host, self.udp_port))
             data, _ = self.udp_socket.recvfrom(4096)
             json_data = data.decode('utf-8')
@@ -155,6 +158,7 @@ class Client:
     def update_player(self, pos_x, pos_y):
         try:
             self.client_socket.send(b'update_player')
+            response = self.client_socket.recv(1024).decode('utf-8')
 
             data = {
                 'username': self.username,
@@ -171,6 +175,7 @@ class Client:
         try:
             # Send request to the server for all players' data
             self.client_socket.send(b'send_all_players')
+            response = self.client_socket.recv(1024).decode('utf-8')
             self.udp_socket.sendto(b'receive_all_players_acr', (self.server_host, self.udp_port))
             # Receive response data from the server
             data, _ = self.udp_socket.recvfrom(4096)  # Receiving data from the server
@@ -189,6 +194,7 @@ class Client:
     def logout(self):
         try:
             self.client_socket.send(b'logout')
+            response = self.client_socket.recv(1024).decode('utf-8')
             self.client_socket.send(self.username.encode('utf-8'))
             response = self.client_socket.recv(1024).decode('utf-8')
             print(response)
@@ -204,6 +210,7 @@ class Client:
     def add_story(self, title, content, username, pos_x, pos_y):
         try:
             self.client_socket.send(b'add_story')
+            response = self.client_socket.recv(1024).decode('utf-8')
             self.client_socket.send(title.encode())
             self.client_socket.recv(1024)
             self.client_socket.send(content.encode())

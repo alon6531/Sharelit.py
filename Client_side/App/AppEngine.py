@@ -176,7 +176,7 @@ class AppEngine:
         self.add_entity(self.player)
 
         # Load and display stories from the client
-        self.load_stories()
+        #self.load_stories()
 
     def load_stories(self):
         """Load and place stories on the map with specific positions"""
@@ -216,7 +216,7 @@ class AppEngine:
 
 
 
-        if current_time - self.refresh_user >= 1000:  # 10 seconds
+        if current_time - self.refresh_user >= 100:  # 10 seconds
             self.client.update_player(self.player.x, self.player.y)
             self.create_player()
             self.refresh_user = current_time
