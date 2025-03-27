@@ -11,7 +11,7 @@ import threading
 
 
 class Client:
-    def __init__(self, server_host='192.168.1.217', tcp_port=65432, udp_port=12345):
+    def __init__(self, server_host='127.0.0.1', tcp_port=65432, udp_port=12345):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
@@ -128,9 +128,7 @@ class Client:
 
     def receive_stories(self):
 
-        self.client_socket.send(b'receive_stories')
-        response = self.client_socket.recv(1024).decode('utf-8')
-        self.udp_socket.sendto(b'receive_stories_acr', (self.server_host, self.udp_port))
+        self.udp_socket.sendto(b'receive_stories', (self.server_host, self.udp_port))
         data, _ = self.udp_socket.recvfrom(4096)
         json_data = data.decode('utf-8')
         stories_data = json.loads(json_data)
@@ -155,9 +153,7 @@ class Client:
 
     def update_player(self, pos_x, pos_y):
         try:
-            self.client_socket.send(b'update_player')
-            response = self.client_socket.recv(1024).decode('utf-8')
-
+            self.udp_socket.sendto(b'update_player', (self.server_host, self.udp_port))
             data = {
                 'username': self.username,
                 'pos_x': pos_x,
@@ -172,9 +168,7 @@ class Client:
     def receive_all_players(self):
         try:
             # Send request to the server for all players' data
-            self.client_socket.send(b'send_all_players')
-            response = self.client_socket.recv(1024).decode('utf-8')
-            self.udp_socket.sendto(b'receive_all_players_acr', (self.server_host, self.udp_port))
+            self.udp_socket.sendto(b'send_all_players', (self.server_host, self.udp_port))
             # Receive response data from the server
             data, _ = self.udp_socket.recvfrom(4096)  # Receiving data from the server
             print("Received data:", data)  # Debugging line to see the raw data

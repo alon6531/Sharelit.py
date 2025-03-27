@@ -81,6 +81,33 @@ class Server:
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket, client_address))
             client_thread.start()
 
+            # Start the UDP listener in a separate thread
+            udp_thread = threading.Thread(target=self.listen_for_udp)
+            udp_thread.daemon = True  # Ensures the thread exits when the main program stops
+            udp_thread.start()
+
+    def listen_for_udp(self):
+        """
+        Listen for incoming UDP messages and handle them.
+        """
+        while True:
+
+
+                data, client_address = self.udp_socket.recvfrom(1024)
+                message = data.decode('utf-8')
+                print(f"Received UDP message from {client_address}: {message}")
+
+                if message == "send_all_players":
+                    self.send_all_players(client_address)
+
+                elif message == "update_player":
+                    self.update_player(client_address)
+
+                elif message == "receive_stories":
+                    self.handle_receive_stories(client_address)
+
+
+
     def handle_client(self, client_socket, client_address):
         """
         Handle communication with a connected client.
@@ -99,22 +126,12 @@ class Server:
                 if action == 'login':
                     self.handle_login(client_socket)
 
-                elif action == 'receive_stories':
-                    self.handle_receive_stories()
-
                 elif action == 'register':
                     self.handle_register(client_socket)
 
                 elif action == 'add_story':
                     self.handle_add_story(client_socket)
 
-                elif action == 'update_player':
-
-                    self.update_player()
-
-                elif action == 'send_all_players':
-
-                    self.send_all_players()
 
                 elif action == 'logout':
                     self.handle_logout(client_socket)
@@ -140,12 +157,11 @@ class Server:
         else:
             client_socket.send(b'False')  # Send failure response
 
-    def handle_receive_stories(self):
+    def handle_receive_stories(self, client_address):
         """
         Handle the request for stories from the client using UDP.
         """
         try:
-            response, client_address = self.udp_socket.recvfrom(1024)
             print("Sending stories to client via UDP...")
 
             # קבלת הנתונים ממסד הנתונים
@@ -250,13 +266,13 @@ class Server:
             client_socket.close()
             print(f"Client {username} logged out and connection closed.")
 
-    def update_player(self):
+    def update_player(self, client_address):
         """
         Receive username and position (pos_x, pos_y) from a client using UDP.
         """
         try:
             # Receive data from client
-            data, client_address = self.udp_socket.recvfrom(1024)
+            data, _ = self.udp_socket.recvfrom(1024)
             player_data = json.loads(data.decode('utf-8'))
 
             username = player_data.get("username")
@@ -282,12 +298,11 @@ class Server:
             print(f"Error receiving username and position via UDP: {e}")
             error_message = json.dumps({"status": "error", "message": str(e)})
 
-    def send_all_players(self):
+    def send_all_players(self, client_address):
         """
         Sends all players' information (username, pos_x, pos_y) to the client using UDP.
         """
         try:
-            response, client_address = self.udp_socket.recvfrom(1024)
             # Prepare the data in a dictionary
 
             players_data = {
@@ -300,12 +315,10 @@ class Server:
             data_to_send = json.dumps(players_data)
 
             # Ensure client_address is a tuple (host, port)
-            if isinstance(client_address, tuple) and len(client_address) == 2:
-                # Send the data to the client using UDP
-                self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
-                print("All players' data sent successfully via UDP.")
-            else:
-                print("Error: client_address must be a tuple (host, port).")
+
+            self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
+            print("All players' data sent successfully via UDP.")
+
         except Exception as e:
             print(f"Error sending players' data via UDP: {e}")
 
