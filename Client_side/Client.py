@@ -11,7 +11,7 @@ import threading
 
 
 class Client:
-    def __init__(self, server_host='127.0.0.1', tcp_port=65432, udp_port=12345):
+    def __init__(self, server_host='192.168.1.217', tcp_port=65432, udp_port=12345):
         """
         Initialize the Client by generating keys, connecting to the server,
         and starting the application engine.
