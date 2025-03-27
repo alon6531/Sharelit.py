@@ -157,9 +157,9 @@ class Server:
 
             # יצירת מילון עם הנתונים
             data = {
-                "title": titles or [],
-                "content": contents or [],
-                "username": usernames or [],
+                "titles": titles or [],
+                "contents": contents or [],
+                "usernames": usernames or [],
                 "pos_x": pos_x or [],
                 "pos_y": pos_y or []
             }

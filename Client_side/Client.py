@@ -127,33 +127,31 @@ class Client:
             print(f"Error during registration: {e}")
 
     def receive_stories(self):
-        try:
-            self.client_socket.send(b'receive_stories')
-            response = self.client_socket.recv(1024).decode('utf-8')
-            self.udp_socket.sendto(b'receive_stories_acr', (self.server_host, self.udp_port))
-            data, _ = self.udp_socket.recvfrom(4096)
-            json_data = data.decode('utf-8')
-            stories_data = json.loads(json_data)
 
-            # Extract data into arrays
-            titles = stories_data['titles']
-            contents = stories_data['contents']
-            usernames = stories_data['usernames']
-            pos_x = stories_data['pos_x']
-            pos_y = stories_data['pos_y']
+        self.client_socket.send(b'receive_stories')
+        response = self.client_socket.recv(1024).decode('utf-8')
+        self.udp_socket.sendto(b'receive_stories_acr', (self.server_host, self.udp_port))
+        data, _ = self.udp_socket.recvfrom(4096)
+        json_data = data.decode('utf-8')
+        stories_data = json.loads(json_data)
 
-            # Print or return the arrays as needed
-            print("Received titles:", titles)
-            print("Received contents:", contents)
-            print("Received usernames:", usernames)
-            print("Received pos_x:", pos_x)
-            print("Received pos_y:", pos_y)
+        # Extract data into arrays
+        titles = stories_data['titles']
+        contents = stories_data['contents']
+        usernames = stories_data['usernames']
+        pos_x = stories_data['pos_x']
+        pos_y = stories_data['pos_y']
 
-            # Return the extracted data as arrays
-            return titles, contents, usernames, pos_x, pos_y
-        except Exception as e:
-            print(f"Error receiving stories: {e}")
-            return []
+        # Print or return the arrays as needed
+        print("Received titles:", titles)
+        print("Received contents:", contents)
+        print("Received usernames:", usernames)
+        print("Received pos_x:", pos_x)
+        print("Received pos_y:", pos_y)
+
+        # Return the extracted data as arrays
+        return titles, contents, usernames, pos_x, pos_y
+
 
     def update_player(self, pos_x, pos_y):
         try:
