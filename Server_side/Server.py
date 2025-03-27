@@ -90,22 +90,29 @@ class Server:
         """
         Listen for incoming UDP messages and handle them.
         """
-        while True:
+        try:
+            while True:
 
 
-                data, client_address = self.udp_socket.recvfrom(1024)
-                message = data.decode('utf-8')
-                self.udp_socket.sendto(data + b' received', (self.host, self.udp_port))
-                print(f"Received UDP message from {client_address}: {message}")
+                    data, client_address = self.udp_socket.recvfrom(1024)
+                    message = data.decode('utf-8')
+                    self.udp_socket.sendto(b'ACK', client_address)
+                    print(f"Received UDP message from {client_address}: {message}")
 
-                if message == "send_all_players":
-                    self.send_all_players(client_address)
+                    if message == "send_all_players":
+                        self.send_all_players(client_address)
 
-                elif message == "update_player":
-                    self.update_player(client_address)
+                    elif message == "update_player":
+                        self.update_player(client_address)
 
-                elif message == "receive_stories":
-                    self.handle_receive_stories(client_address)
+                    elif message == "receive_stories":
+                        self.handle_receive_stories(client_address)
+        except Exception as e:
+            print(f"Error with client {client_address}: {e}")
+
+        finally:
+            self.udp_socket.close()
+            print(f"Closed connection with {client_address}")
 
 
 
@@ -272,10 +279,12 @@ class Server:
         Receive username and position (pos_x, pos_y) from a client using UDP.
         """
         try:
-            # Receive data from client
             data, _ = self.udp_socket.recvfrom(1024)
-            player_data = json.loads(data.decode('utf-8'))
 
+            if not data:  # בדיקה אם הנתונים ריקים
+                raise ValueError("Received empty data")
+
+            player_data = json.loads(data.decode('utf-8'))
             username = player_data.get("username")
             pos_x = player_data.get("pos_x")
             pos_y = player_data.get("pos_y")
@@ -285,7 +294,7 @@ class Server:
 
             print(f"Received via UDP -> username: {username}, x: {pos_x}, y: {pos_y}")
 
-            # Update the players list
+            # עדכון רשימת השחקנים
             for player in self.players:
                 if player.username == username:
                     player.pos_x = pos_x
@@ -294,10 +303,19 @@ class Server:
             else:
                 self.players.append(User(username, pos_x, pos_y))
 
+            # שליחת אישור ללקוח
+            success_message = json.dumps({"status": "success"})
+            self.udp_socket.sendto(success_message.encode('utf-8'), client_address)
+
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON: {e}")
+            error_message = json.dumps({"status": "error", "message": "Invalid JSON"})
+            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
 
         except Exception as e:
             print(f"Error receiving username and position via UDP: {e}")
             error_message = json.dumps({"status": "error", "message": str(e)})
+            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
 
     def send_all_players(self, client_address):
         """
