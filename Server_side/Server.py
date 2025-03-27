@@ -11,7 +11,7 @@ import json
 
 
 class Server:
-    def __init__(self, host='192.168.1.217', port=65432):
+    def __init__(self, host='127.0.0.1', port=65432, udp_port=12345):
         """
         Initialize the Server, generate keys, and start the server socket.
         """
@@ -19,9 +19,10 @@ class Server:
         self.sql_data_base = SqlDataBase.SqlDataBase()
         self.json_data_base = jsonDataBase.jsonDataBase()
 
-        # Set host and port for the server
+        # Set host and ports for the server
         self.host = host
         self.port = port
+        self.udp_port = udp_port
         self.players = []
 
         # Generate RSA keys (private and public) for encryption/decryption
@@ -39,6 +40,11 @@ class Server:
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(5)
         print(f"Server listening on {self.host}:{self.port}...")
+
+        # Create UDP socket for receiving player updates
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.bind((self.host, self.udp_port))
+        print(f"UDP server listening on {self.host}:{self.udp_port}...")
 
         # Start accepting incoming connections in a loop
         print("Server is running...")
@@ -93,7 +99,7 @@ class Server:
                     self.handle_login(client_socket)
 
                 elif action == 'receive_stories':
-                    self.handle_receive_stories(client_socket)
+                    self.handle_receive_stories()
 
                 elif action == 'register':
                     self.handle_register(client_socket)
@@ -102,15 +108,16 @@ class Server:
                     self.handle_add_story(client_socket)
 
                 elif action == 'update_player':
-                    self.update_player(client_socket)
+
+                    self.update_player()
 
                 elif action == 'send_all_players':
-                    self.send_all_players(client_socket)
+
+                    self.send_all_players()
 
                 elif action == 'logout':
                     self.handle_logout(client_socket)
                     break
-
 
         except Exception as e:
             print(f"Error with client {client_address}: {e}")
@@ -132,38 +139,33 @@ class Server:
         else:
             client_socket.send(b'False')  # Send failure response
 
-    def handle_receive_stories(self, client_socket):
+    def handle_receive_stories(self):
         """
-        Handle the request for stories from the client.
+        Handle the request for stories from the client using UDP.
         """
-        print("Sending stories to client...")
+        response, client_address = self.udp_socket.recvfrom(1024)
+        print("Sending stories to client via UDP...")
         titles, contents, usernames, pos_x, pos_y = self.json_data_base.receive_data()
 
-        # Send the number of stories
-        client_socket.send(str(len(titles)).encode('utf-8'))
+        # Create a dictionary to hold all the data
+        data = {
+            "titles": titles,
+            "contents": contents,
+            "usernames": usernames,
+            "pos_x": pos_x,
+            "pos_y": pos_y
+        }
 
-        # Send each title, content, username, pos_x, and pos_y iteratively
-        for title in titles:
-            client_socket.send(title.encode('utf-8'))
-            client_socket.recv(1024)
+        # Convert the dictionary to a JSON string
+        json_data = json.dumps(data)
 
-        for content in contents:
-            client_socket.send(content.encode('utf-8'))
-            client_socket.recv(1024)
+        # Create a UDP socket
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        for username in usernames:
-            client_socket.send(username.encode('utf-8'))
-            client_socket.recv(1024)
+        # Send the JSON data to the client
+        udp_socket.sendto(json_data.encode('utf-8'), client_address)
 
-        for x in pos_x:
-            client_socket.send(str(x).encode('utf-8'))
-            client_socket.recv(1024)
-
-        for y in pos_y:
-            client_socket.send(str(y).encode('utf-8'))
-            client_socket.recv(1024)
-
-        print("Stories sent successfully.")
+        print("Stories sent successfully via UDP.")
 
     def handle_register(self, client_socket):
         """
@@ -238,14 +240,14 @@ class Server:
             client_socket.close()
             print(f"Client {username} logged out and connection closed.")
 
-    def update_player(self, client_socket):
+    def update_player(self):
         """
-        מקבל מהלקוח את שם המשתמש והמיקום באמצעות JSON.
+        Receive username and position (pos_x, pos_y) from a client using UDP.
         """
         try:
-            # קבלת נתונים מהלקוח
-            data = client_socket.recv(1024).decode('utf-8')
-            player_data = json.loads(data)
+            # Receive data from client
+            data, client_address = self.udp_socket.recvfrom(1024)
+            player_data = json.loads(data.decode('utf-8'))
 
             username = player_data.get("username")
             pos_x = player_data.get("pos_x")
@@ -254,9 +256,9 @@ class Server:
             if username is None or pos_x is None or pos_y is None:
                 raise ValueError("Invalid data received")
 
-            print(f"Received username: {username}, x: {pos_x}, y: {pos_y}")
+            print(f"Received via UDP -> username: {username}, x: {pos_x}, y: {pos_y}")
 
-            # עדכון רשימת השחקנים
+            # Update the players list
             for player in self.players:
                 if player.username == username:
                     player.pos_x = pos_x
@@ -265,34 +267,37 @@ class Server:
             else:
                 self.players.append(User(username, pos_x, pos_y))
 
-            # שליחת אישור ללקוח
-            client_socket.send(b"Username and position received successfully.")
 
         except Exception as e:
-            print(f"Error receiving username and position: {e}")
-            client_socket.send(b"Error receiving username and position.")
-    def send_all_players(self, client_socket):
+            print(f"Error receiving username and position via UDP: {e}")
+            error_message = json.dumps({"status": "error", "message": str(e)})
+
+    def send_all_players(self):
         """
-        Sends all players' information (username, pos_x, pos_y) to the client.
+        Sends all players' information (username, pos_x, pos_y) to the client using UDP.
         """
         try:
+            response, client_address = self.udp_socket.recvfrom(1024)
             # Prepare the data in a dictionary
+
             players_data = {
                 "num_players": len(self.players),
                 "players": [{"username": player.username, "pos_x": player.pos_x, "pos_y": player.pos_y} for player in
                             self.players]
             }
 
-            # Convert to JSON string and send
+            # Convert to JSON string
             data_to_send = json.dumps(players_data)
-            client_socket.send(data_to_send.encode('utf-8'))
 
-            print("All players' data sent successfully.")
+            # Ensure client_address is a tuple (host, port)
+            if isinstance(client_address, tuple) and len(client_address) == 2:
+                # Send the data to the client using UDP
+                self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
+                print("All players' data sent successfully via UDP.")
+            else:
+                print("Error: client_address must be a tuple (host, port).")
         except Exception as e:
-            print(f"Error sending players' data: {e}")
-            client_socket.send(b"Error sending players' data.")
-
-
+            print(f"Error sending players' data via UDP: {e}")
 
 
 # Main entry point for the server

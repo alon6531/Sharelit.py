@@ -216,7 +216,7 @@ class AppEngine:
 
 
 
-        if current_time - self.refresh_user >= 10:  # 10 seconds
+        if current_time - self.refresh_user >= 1000:  # 10 seconds
             self.client.update_player(self.player.x, self.player.y)
             self.create_player()
             self.refresh_user = current_time
@@ -227,7 +227,6 @@ class AppEngine:
 
     def create_player(self):
         num_of_players, users = self.client.receive_all_players()
-
 
         # First, remove entities that are no longer in the users list
         usernames_in_users = [user.username for user in users]
