@@ -216,7 +216,7 @@ class AppEngine:
 
 
 
-        if current_time - self.refresh_user >= 100:  # 10 seconds
+        if current_time - self.refresh_user >= 1:  # 10 seconds
             self.create_player()
             self.refresh_user = current_time
 
