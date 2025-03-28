@@ -6,11 +6,11 @@ from Client_side.App.Story import Story
 from Client_side.App.Map import Map
 from Client_side.App.StoryWindow import StoryWindow
 from Client_side.App.AddStory import AddStory
-from Client_side.App.PlusButton import PlusButton
 from Client_side.App.User import User
+from Client_side.App.Button import Button
 
 class AppEngine:
-    def __init__(self, client, status, width=960, height=480, title="Game Engine"):
+    def __init__(self, client, status, width=1920, height=1080, title="Game Engine"):
         pygame.init()
         self.client = client
         self.status = status
@@ -41,7 +41,6 @@ class AppEngine:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-                self.client.logout()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 # Handle button clicks
                 self.handle_button_click(pygame.mouse.get_pos())
@@ -52,13 +51,18 @@ class AppEngine:
 
         # Handle Plus button click
         for entity in self.entities:
-            if isinstance(entity, PlusButton) and entity.on_click(mouse_pos):
-                print("Plus button clicked!")  # Debugging
-                self.add_story_window()
+            if isinstance(entity, Button) and entity.on_click(mouse_pos):
+
+                if entity.button_name == "add_story" :
+                    self.add_story_window()
+
+                if entity.button_name == "go_back" :
+                    self.running = False
+
+
 
         # Check 'Read More' button click only if it exists
-        if self.read_more_button_rect and self.read_more_button_rect.collidepoint(mouse_pos):
-            print("Read More button clicked!")  # Debugging
+        if hasattr(self, 'read_more_button') and self.read_more_button.on_click(mouse_pos):
             if self.colliding_entity_info:
                 self.open_story_window(self.colliding_entity_info)
 
@@ -82,9 +86,6 @@ class AppEngine:
             text_x = entity_rect.centerx - self.camera.x
             text_y = entity_rect.top - 120 - self.camera.y
 
-            # Initialize button rect position only if needed
-            self.read_more_button_rect = pygame.Rect(text_x - 60, text_y + 50, 120, 40)
-
             # Draw info box
             info_box_width = 400
             info_box_height = 200
@@ -95,19 +96,19 @@ class AppEngine:
                              border_radius=corner_radius)
 
             font = pygame.font.Font("../font.ttf", 24)
+            title_font = pygame.font.Font("../font.ttf", 30)
+            from_font = pygame.font.Font("../font.ttf", 20)
             preview = self.colliding_entity_info.get_description()[:35] + "..." if len(
                 self.colliding_entity_info.get_description()) > 100 else self.colliding_entity_info.get_description()
-            self.wrap_text_and_render(preview, font, (text_x, text_y))
+            self.wrap_text_and_render(preview, font, (text_x, text_y), from_font, title_font)
 
-    def draw_read_more_button(self, text_position, font):
-        """Draw the 'Read More' button and store its position"""
-        if self.colliding_entity_info:
-            self.read_more_button_rect = pygame.Rect(text_position[0] - 60, text_position[1] + 50, 120, 40)
-            pygame.draw.rect(self.screen, (29, 64, 99), self.read_more_button_rect, border_radius=10)
-            button_text = font.render(self.reverse_words_and_letters_in_text("קרא עוד"), True, (255, 255, 255))
-            self.screen.blit(button_text, (self.read_more_button_rect.x + 15, self.read_more_button_rect.y + 5))
+            # Create the 'Read More' button dynamically
+            self.read_more_button = Button("read_more", text_x - 60, text_y + 50, 120, 40, (29, 64, 99), (50, 90, 150),
+                                           self.reverse_words_and_letters_in_text("קרא עוד"), border_radius=10,
+                                           num_of_side=4)
+            self.read_more_button.render(self.screen, self.camera)  # Draw the button
 
-    def wrap_text_and_render(self, preview, font, text_position):
+    def wrap_text_and_render(self, preview, font, text_position, from_font, title_font):
         """Wrap text to fit inside the info box and render it"""
         wrapped_lines = []
         for raw_line in preview.splitlines():
@@ -119,16 +120,23 @@ class AppEngine:
                 else:
                     wrapped_lines.append(line)
                     line = word + " "
-                    line = word + " "
             wrapped_lines.append(line)
 
         line_y = text_position[1] - 100
-        for line in wrapped_lines:
-            text_surface = font.render(line, True, (0, 0, 0))
+        for idx, line in enumerate(wrapped_lines):
+            # Use title_font for the first line
+            if idx == 0:
+                line_font = from_font # Use larger font for the title or first line
+            # Use secend_font for the second line
+            elif idx == 1:
+                line_font = title_font  # Use a different font for the second line
+            else:
+                line_font = font  # Use the regular font for subsequent lines
+
+            text_surface = line_font.render(line, True, (0, 0, 0))
             self.screen.blit(text_surface, (text_position[0] - text_surface.get_width() // 2, line_y))
             line_y += text_surface.get_height() + 5
 
-        self.draw_read_more_button(text_position, font)
 
     def render(self):
         """Render all entities to the screen"""
@@ -138,6 +146,18 @@ class AppEngine:
         for entity in self.entities:
             if entity is not self.player:
                 entity.render(self.screen, self.camera)
+
+        is_hover = False
+        for entity in self.entities:
+            if isinstance(entity, Button) and entity.is_hovered:
+                is_hover = True
+                break
+            # Change the cursor to a hand on hover (this will now always be updated in the render)
+
+        if is_hover or (hasattr(self, 'read_more_button') and self.read_more_button.is_hovered):
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        else:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
         # Render the player last to ensure it's on top
         if self.player:
@@ -169,8 +189,12 @@ class AppEngine:
         map_entity = Map(-1920 * 2, -1080 * 2, 1920 * 5, 1080 * 5, "../assets/map.png")
         self.add_entity(map_entity)
         # Create the plus button and player
-        plus_button = PlusButton(self.width/ 2, self.height - 60, 100, 100)
-        self.add_entity(plus_button)
+        add_story_b = Button("add_story", self.width/ 2, self.height - 60, 100, 100, (29, 64, 99), (70, 130, 180), "+", 100 / 2, 0, 75)
+        self.add_entity(add_story_b)
+
+        # Create the go back button and player
+        go_back_b = Button("go_back",self.width - 200,  60, 150, 75, (29, 64, 99), (34, 72, 115), self.reverse_words_and_letters_in_text(">>יציאה"), 20, 4, 30)
+        self.add_entity(go_back_b)
 
         self.player = Player(100, 100,  self.client.username, 50, 50, (0, 255, 0))  # Player as a green square
         self.add_entity(self.player)
@@ -208,7 +232,6 @@ class AppEngine:
         for entity in self.entities:
             entity.update()
 
-
         # Update camera position to follow the player
         self.camera.center = self.player.get_rect().center
 
@@ -223,6 +246,8 @@ class AppEngine:
         if current_time - self.refresh_story >= 10000:  # 10 seconds
             self.load_stories()
             self.refresh_story = current_time
+
+
 
     def create_player(self):
         try:
@@ -292,5 +317,6 @@ class AppEngine:
         except Exception as e:
             print("Unexpected error:", e)
 
+        self.client.logout()
         self.status[0] = "Log_In"
         pygame.quit()
