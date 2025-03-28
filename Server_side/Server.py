@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives import hashes
 from Server_side import SqlDataBase, jsonDataBase
 from Client_side.App.User import User
 import json
+import time
 
 
 class Server:
@@ -91,10 +92,10 @@ class Server:
         Listen for incoming UDP messages and handle them.
         """
         try:
+            time.sleep(0.1)  # Adding a small delay of 100ms
             while True:
                 data, client_address = self.udp_socket.recvfrom(1024)
                 message = data.decode('utf-8')
-                self.udp_socket.sendto(b'ACK', client_address)
 
                 print(f"Received UDP message from {client_address}: {message}\n")
 

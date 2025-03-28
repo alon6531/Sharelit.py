@@ -125,7 +125,7 @@ class Client:
     def send_player_data(self, pos_x, pos_y):
         try:
             self.udp_socket.sendto(b'send_player_data', (self.server_host, self.udp_port))
-            _, _ = self.udp_socket.recvfrom(4096)
+
             # Prepare the data to send (username, pos_x, pos_y)
             player_data = {
                 "username": self.username,
@@ -145,9 +145,19 @@ class Client:
             response = json.loads(data.decode('utf-8'))
 
             # Assuming the response contains the number of players and the list of users
-            num_players = response.get('num_players', 0)  # Default to 0 if not found
-            users = response.get('users', [])  # Default to empty list if not found
+            num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
+            print(response)
 
+            # Extract players' information, default to an empty list if 'players' key is not found
+            users_db = response.get('players', [])
+            users = []
+            # Example to demonstrate users' data
+            for user in users_db:
+                username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
+                pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
+                pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
+                print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
+                users.append(User(username, pos_x, pos_y))
             return num_players, users
 
         except Exception as e:

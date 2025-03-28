@@ -226,7 +226,7 @@ class AppEngine:
 
     def create_player(self):
         num_of_players, users = self.client.send_player_data(self.player.x, self.player.y)
-
+        print(num_of_players)
         # First, remove entities that are no longer in the users list
         usernames_in_users = [user.username for user in users]
         self.entities = [entity for entity in self.entities if
