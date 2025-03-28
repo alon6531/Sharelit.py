@@ -10,9 +10,10 @@ class StoryWindow:
         self.full_text = full_text
         self.font_path = font_path
         self.font = pygame.font.Font(self.font_path, 32)
+        self.small_font = pygame.font.Font(self.font_path, 24)
         from_font = pygame.font.Font(self.font_path, 26)
         from_font.set_italic(True)  # Makes the font italic
-        title_font = pygame.font.Font(self.font_path, 50)
+        title_font = pygame.font.Font(self.font_path, 40)
         title_font.set_underline(True)  # Makes the font underlined
         self.wrapped_text = self.wrap_text(full_text, self.font, from_font, title_font)
         self.scroll_y = 200  # Start further down for centering
@@ -25,11 +26,11 @@ class StoryWindow:
         self.back_button = Button(
             button_name="Back",
             x=self.window_width // 2 - 100,
-            y=self.window_height - 200,
+            y=self.window_height - 150,
             width=200,
             height=60,
-            color=(200, 0, 0),
-            hover_color=(255, 0, 0),
+            color=(210, 148, 34),
+            hover_color=(255, 171, 15),
             text="Back",
             border_radius=10,
             num_of_side=4,  # Rectangle shape
@@ -45,16 +46,20 @@ class StoryWindow:
             words = line.split()  # Split each line into words
             wrapped_line = ""
 
-            # Use different fonts based on the line index
+            # Use different fonts based on the line index and line length
             if idx == 0:
                 line_font = from_font  # Use from_font for the first line
             elif idx == 1:
                 line_font = title_font  # Use title_font for the second line
             else:
-                line_font = font  # Use regular font for subsequent lines
+                if len(line) > 100:  # Check if the line exceeds 100 characters
+                    line_font = self.small_font  # Use small font for longer lines
+                else:
+                    line_font = font  # Use regular font for shorter lines
 
             for word in words:
-                if line_font.size(wrapped_line + word)[0] < 1000:  # Adjusted width for better centering
+                if line_font.size(wrapped_line + word)[
+                    0] < self.window_width // 2:  # Adjusted width for better centering
                     wrapped_line += word + " "
                 else:
                     wrapped_text.append((wrapped_line.strip(), line_font))  # Store wrapped line with font

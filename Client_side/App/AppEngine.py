@@ -1,3 +1,5 @@
+from xml.dom.minidom import Entity
+
 import pygame
 from Client_side.App.GameObject import *
 from Client_side.App.Player import Player
@@ -10,7 +12,7 @@ from Client_side.App.User import User
 from Client_side.App.Button import Button
 
 class AppEngine:
-    def __init__(self, client, status, width=1920, height=1080, title="Game Engine"):
+    def __init__(self, client, status, width=1280, height=720, title="Game Engine"):
         pygame.init()
         self.client = client
         self.status = status
@@ -86,20 +88,35 @@ class AppEngine:
             text_x = entity_rect.centerx - self.camera.x
             text_y = entity_rect.top - 120 - self.camera.y
 
-            # Draw info box
-            info_box_width = 400
-            info_box_height = 200
+            # Info box dimensions and opacity
+            info_box_width = 400 * 1.1
+            info_box_height = 200* 1.1
             corner_radius = 15
-            pygame.draw.rect(self.screen, (255, 255, 255),
-                             (text_x - info_box_width // 2, text_y - info_box_height // 2,
-                              info_box_width, info_box_height),
+
+            # Create a surface with transparency (SRCALPHA)
+            info_box_surface = pygame.Surface((info_box_width, info_box_height), pygame.SRCALPHA)
+
+            # Fill the surface with a semi-transparent color (RGBA format)
+            info_box_surface.fill((0, 0, 0, 0))  # 128 is 50% opacity
+
+            # Apply a rounded corner effect to the info box
+            pygame.draw.rect(info_box_surface, (255, 255, 255, 225),
+                             (0, 0, info_box_width, info_box_height),
                              border_radius=corner_radius)
 
+            # Now draw this surface onto the main screen
+            self.screen.blit(info_box_surface, (text_x - info_box_width // 2, text_y - info_box_height // 2))
+
+            # Set up fonts
             font = pygame.font.Font("../font.ttf", 24)
             title_font = pygame.font.Font("../font.ttf", 30)
             from_font = pygame.font.Font("../font.ttf", 20)
+
+            # Get preview text (and truncate if necessary)
             preview = self.colliding_entity_info.get_description()[:35] + "..." if len(
                 self.colliding_entity_info.get_description()) > 100 else self.colliding_entity_info.get_description()
+
+            # Wrap and render text
             self.wrap_text_and_render(preview, font, (text_x, text_y), from_font, title_font)
 
             # Create the 'Read More' button dynamically
@@ -145,7 +162,12 @@ class AppEngine:
         # Render all entities except the player
         for entity in self.entities:
             if entity is not self.player:
-                entity.render(self.screen, self.camera)
+                    entity.render(self.screen, self.camera)
+
+        for entity in self.entities:
+            if entity is not self.player:
+                if isinstance(entity, Others):
+                    entity.render(self.screen, self.camera)
 
         is_hover = False
         for entity in self.entities:
