@@ -123,46 +123,56 @@ class Client:
         return titles, contents, usernames, pos_x, pos_y
 
     def send_player_data(self, pos_x, pos_y):
-        try:
-            self.udp_socket.sendto(b'send_player_data', (self.server_host, self.udp_port))
+        retries = 3  # Number of retry attempts
+        attempt = 0
 
-            # Prepare the data to send (username, pos_x, pos_y)
-            player_data = {
-                "username": self.username,
-                "pos_x": pos_x,
-                "pos_y": pos_y
-            }
+        while attempt < retries:
+            try:
+                # Send initial signal to server
+                self.udp_socket.sendto(b'send_player_data', (self.server_host, self.udp_port))
 
-            # Convert the data to JSON and send it to the server
-            data_to_send = json.dumps(player_data)
-            self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
-            print(f"Sent player data to server: {player_data}\n")
+                # Prepare the data to send (username, pos_x, pos_y)
+                player_data = {
+                    "username": self.username,
+                    "pos_x": pos_x,
+                    "pos_y": pos_y
+                }
 
-            # Wait for the server's response (list of all players)
-            data, _ = self.udp_socket.recvfrom(1024)
+                # Convert the data to JSON and send it to the server
+                data_to_send = json.dumps(player_data)
+                self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
+                print(f"Sent player data to server: {player_data}\n")
 
-            # Decode and parse the server's response
-            response = json.loads(data.decode('utf-8'))
+                # Wait for the server's response (list of all players)
+                data, _ = self.udp_socket.recvfrom(1024)
 
-            # Assuming the response contains the number of players and the list of users
-            num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
-            print(response)
+                # Decode and parse the server's response
+                response = json.loads(data.decode('utf-8'))
 
-            # Extract players' information, default to an empty list if 'players' key is not found
-            users_db = response.get('players', [])
-            users = []
-            # Example to demonstrate users' data
-            for user in users_db:
-                username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
-                pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
-                pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
-                print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
-                users.append(User(username, pos_x, pos_y))
-            return num_players, users
+                # Assuming the response contains the number of players and the list of users
+                num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
+                print(response)
 
-        except Exception as e:
-            print(f"Error sending/receiving player data: {e}")
-            return None, None  # Return None if there was an error
+                # Extract players' information, default to an empty list if 'players' key is not found
+                users_db = response.get('players', [])
+                users = []
+                for user in users_db:
+                    username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
+                    pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
+                    pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
+                    print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
+                    users.append(User(username, pos_x, pos_y))
+                return num_players, users
+
+            except Exception as e:
+                print(f"Error sending/receiving player data (Attempt {attempt + 1}/{retries}): {e}")
+                attempt += 1
+                if attempt < retries:
+                    print("Retrying...")
+                    time.sleep(2)  # Optional: wait for 2 seconds before retrying
+                else:
+                    print("Max retries reached. Could not send player data.")
+                    return None, None  # Return None if max retries are reached
 
     def logout(self):
         try:

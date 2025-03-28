@@ -91,9 +91,13 @@ class Server:
         """
         Listen for incoming UDP messages and handle them.
         """
-        try:
-            time.sleep(0.1)  # Adding a small delay of 100ms
-            while True:
+        retries = 3  # Number of retry attempts for the whole loop
+        attempt = 0
+
+        while attempt < retries:
+            try:
+                time.sleep(0.1)  # Adding a small delay of 100ms
+
                 data, client_address = self.udp_socket.recvfrom(1024)
                 message = data.decode('utf-8')
 
@@ -102,13 +106,18 @@ class Server:
                 if message == "send_player_data":
                     self.update_and_send_players(client_address)
 
+                # Reset attempt counter if successful
+                attempt = 0  # Success, reset attempts
 
-        except Exception as e:
-            print(f"Error with client {client_address}: {e}\n")
-
-        finally:
-            self.udp_socket.close()
-            print(f"Closed connection with {client_address}\n")
+            except Exception as e:
+                print(f"Error with client (Attempt {attempt + 1}/{retries}): {e}\n")
+                attempt += 1
+                if attempt < retries:
+                    print("Retrying...")
+                    time.sleep(2)  # Optional: wait for 2 seconds before retrying
+                else:
+                    print("Max retries reached. Exiting listen loop.")
+                    break  # Exit after max retries reached
 
     def handle_client(self, client_socket, client_address):
         """
@@ -271,51 +280,62 @@ class Server:
         """
         Receive player data from a client (username, pos_x, pos_y) and send all players' information via UDP.
         """
-        try:
-            # Receive the player's update (username, pos_x, pos_y)
-            data, _ = self.udp_socket.recvfrom(1024)
+        retries = 3  # Number of retry attempts
+        attempt = 0
 
-            if not data:  # Check if the data is empty
-                raise ValueError("Received empty data")
+        while attempt < retries:
+            try:
+                # Receive the player's update (username, pos_x, pos_y)
+                data, _ = self.udp_socket.recvfrom(1024)
 
-            player_data = json.loads(data.decode('utf-8'))
-            username = player_data.get("username")
-            pos_x = player_data.get("pos_x")
-            pos_y = player_data.get("pos_y")
+                if not data:  # Check if the data is empty
+                    raise ValueError("Received empty data")
 
-            print(f"Received via UDP -> username: {username}, x: {pos_x}, y: {pos_y}\n")
+                player_data = json.loads(data.decode('utf-8'))
+                username = player_data.get("username")
+                pos_x = player_data.get("pos_x")
+                pos_y = player_data.get("pos_y")
 
-            # Update or add the player to the list
-            for player in self.players:
-                if player.username == username:
-                    player.pos_x = pos_x
-                    player.pos_y = pos_y
-                    break
-            else:
-                self.players.append(User(username, pos_x, pos_y))
+                print(f"Received via UDP -> username: {username}, x: {pos_x}, y: {pos_y}\n")
 
-            # Prepare and send all players' information to the client
-            players_data = {
-                "num_players": len(self.players),
-                "players": [{"username": player.username, "pos_x": player.pos_x, "pos_y": player.pos_y} for player in
-                            self.players]
-            }
+                # Update or add the player to the list
+                for player in self.players:
+                    if player.username == username:
+                        player.pos_x = pos_x
+                        player.pos_y = pos_y
+                        break
+                else:
+                    self.players.append(User(username, pos_x, pos_y))
 
-            # Convert to JSON string and send the data
-            data_to_send = json.dumps(players_data)
-            self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
-            print("All players' data sent successfully via UDP.\n")
+                # Prepare and send all players' information to the client
+                players_data = {
+                    "num_players": len(self.players),
+                    "players": [{"username": player.username, "pos_x": player.pos_x, "pos_y": player.pos_y} for player in self.players]
+                }
 
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}\n")
-            error_message = json.dumps({"status": "error", "message": "Invalid JSON"})
-            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
+                # Convert to JSON string and send the data
+                data_to_send = json.dumps(players_data)
+                self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
+                print("All players' data sent successfully via UDP.\n")
 
-        except Exception as e:
-            print(f"Error updating and sending players' data via UDP: {e}\n")
-            error_message = json.dumps({"status": "error", "message": str(e)})
-            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
+                return  # Exit the function if everything works fine
 
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON: {e}\n")
+                error_message = json.dumps({"status": "error", "message": "Invalid JSON"})
+                self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
+                break  # Exit on this specific error, no need to retry
+
+            except Exception as e:
+                print(f"Error updating and sending players' data via UDP (Attempt {attempt + 1}/{retries}): {e}\n")
+                attempt += 1
+                if attempt < retries:
+                    print("Retrying...")
+                    time.sleep(2)  # Optional: wait for 2 seconds before retrying
+                else:
+                    error_message = json.dumps({"status": "error", "message": str(e)})
+                    self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
+                    print("Max retries reached. Could not update/send players' data.")
 
 # Main entry point for the server
 if __name__ == "__main__":
