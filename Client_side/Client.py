@@ -122,80 +122,37 @@ class Client:
         # Return the extracted data as arrays
         return titles, contents, usernames, pos_x, pos_y
 
-    def update_player(self, pos_x, pos_y):
+    def send_player_data(self, pos_x, pos_y):
         try:
-            # First, send an initial 'update_player' request to indicate the intention to update
-            self.udp_socket.sendto(b'update_player', (self.server_host, self.udp_port))
-
-            # Wait for server acknowledgment (ACK)
-            try:
-                response, _ = self.udp_socket.recvfrom(1024)
-                if response != b'ACK':
-                    print("Expected ACK response, but received:", response)
-                    return
-            except socket.timeout:
-                print("UDP response timed out")
-                return
-
-            # Send the player data in JSON format (username, pos_x, pos_y)
-            data = {
-                'username': self.username,  # Assumes 'self.username' is already set
-                'pos_x': pos_x,
-                'pos_y': pos_y
+            self.udp_socket.sendto(b'send_player_data', (self.server_host, self.udp_port))
+            _, _ = self.udp_socket.recvfrom(4096)
+            # Prepare the data to send (username, pos_x, pos_y)
+            player_data = {
+                "username": self.username,
+                "pos_x": pos_x,
+                "pos_y": pos_y
             }
-            json_data = json.dumps(data)
 
-            # Send the actual player update message
-            self.udp_socket.sendto(json_data.encode(), (self.server_host, self.udp_port))
-            print(f"Sent update for player {self.username}: x={pos_x}, y={pos_y}")
+            # Convert the data to JSON and send it to the server
+            data_to_send = json.dumps(player_data)
+            self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
+            print(f"Sent player data to server: {player_data}\n")
 
-            # Wait for a success response from the server
-            try:
-                response, _ = self.udp_socket.recvfrom(1024)
-                print("Server response:", response.decode('utf-8'))
-            except socket.timeout:
-                print("UDP response timed out after sending player data.")
-        except Exception as e:
-            print(f"Error updating player position: {e}")
+            # Wait for the server's response (list of all players)
+            data, _ = self.udp_socket.recvfrom(1024)
 
-    def receive_all_players(self):
-        try:
-            # Send request to the server for all players' data
-            self.udp_socket.sendto(b'send_all_players', (self.server_host, self.udp_port))
-            try:
-                response, _ = self.udp_socket.recvfrom(1024)
-                if response != b'ACK':
-                    print("Expected ACK response, but received:", response)
-                    return
-            except socket.timeout:
-                print("UDP response timed out")
-                return
-            # Receive player data from the server
-            data, _ = self.udp_socket.recvfrom(4096)  # Receiving data from the server
-            print("Received player data:", data)  # Debugging line to see the raw data
+            # Decode and parse the server's response
+            response = json.loads(data.decode('utf-8'))
 
-            # Parse the player data (JSON)
-            players_data = json.loads(data.decode('utf-8'))
-
-            # Extract the number of players and their data
-            num_players = players_data["num_players"]
-            users = [User(p["username"], p["pos_x"], p["pos_y"]) for p in players_data["players"]]
-
-            # Receive the success message after receiving the player data
-            success_message, _ = self.udp_socket.recvfrom(1024)
-            success_data = json.loads(success_message.decode('utf-8'))
-
-            # Check if the success status is "success"
-            if success_data.get("status") == "success":
-                print("Player data successfully received.")
-            else:
-                print("Error: Player data reception failed.")
+            # Assuming the response contains the number of players and the list of users
+            num_players = response.get('num_players', 0)  # Default to 0 if not found
+            users = response.get('users', [])  # Default to empty list if not found
 
             return num_players, users
 
         except Exception as e:
-            print(f"Error receiving players' data: {e}")
-            return 0, []
+            print(f"Error sending/receiving player data: {e}")
+            return None, None  # Return None if there was an error
 
     def logout(self):
         try:
