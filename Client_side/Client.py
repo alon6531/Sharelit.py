@@ -100,26 +100,35 @@ class Client:
 
     def receive_stories(self):
 
-        self.udp_socket.sendto(b'receive_stories', (self.server_host, self.udp_port))
-        data, _ = self.udp_socket.recvfrom(4096)
+        # Send request to receive stories
+        self.client_socket.send(b'receive_stories')
+        response = self.client_socket.recv(1024).decode('utf-8')
+
+        # Receive data from server
+
+
+        data = self.client_socket.recv(4096)
+
+
+        # Decode and parse JSON
         json_data = data.decode('utf-8')
         stories_data = json.loads(json_data)
 
         # Extract data into arrays
-        titles = stories_data['titles']
-        contents = stories_data['contents']
-        usernames = stories_data['usernames']
-        pos_x = stories_data['pos_x']
-        pos_y = stories_data['pos_y']
+        titles = stories_data.get('titles', [])
+        contents = stories_data.get('contents', [])
+        usernames = stories_data.get('usernames', [])
+        pos_x = stories_data.get('pos_x', [])
+        pos_y = stories_data.get('pos_y', [])
 
-        # Print or return the arrays as needed
+        # Print received data
         print("Received titles:", titles)
         print("Received contents:", contents)
         print("Received usernames:", usernames)
         print("Received pos_x:", pos_x)
         print("Received pos_y:", pos_y)
 
-        # Return the extracted data as arrays
+        # Return extracted data
         return titles, contents, usernames, pos_x, pos_y
 
     def send_player_data(self, pos_x, pos_y):
@@ -161,18 +170,31 @@ class Client:
 
         return num_players, users
 
-
-
     def logout(self):
         try:
+            # Send logout request over TCP to the server
             self.client_socket.send(b'logout')
             response = self.client_socket.recv(1024).decode('utf-8')
+
+            # Send the username over TCP for the server to process
             self.client_socket.send(self.username.encode('utf-8'))
             response = self.client_socket.recv(1024).decode('utf-8')
+            print(response)
+
+            # Notify the server via UDP that the client is logging out
+            logout_message = {
+                "action": "logout",
+                "username": self.username
+            }
+            data_to_send = json.dumps(logout_message)
+            self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
+            print(f"Sent logout message to server via UDP: {logout_message}")
+            response, _ = self.udp_socket.recvfrom(1024)
             print(response)
         except Exception as e:
             print(f"Error during logout: {e}")
         finally:
+            # Close the UDP socket and TCP socket
             self.udp_socket.close()
             print("Disconnected from server.")
 

@@ -94,17 +94,22 @@ class Server:
 
         time.sleep(0.1)  # Adding a small delay of 100ms
         while True:
+            if self.udp_socket.fileno() == -1:
+                print("Socket is closed.")
+                break
+            # Receive data from the socket
+            massage, client_address = self.udp_socket.recvfrom(1024)
+            data = json.loads(massage.decode('utf-8'))
+            action = data['action']
 
-                # Receive data from the socket
-                massage, client_address = self.udp_socket.recvfrom(1024)
-                data = json.loads(massage.decode('utf-8'))
-                action = data['action']
 
+            print(f"Received UDP message from {client_address}: {action}\n")
 
-                print(f"Received UDP message from {client_address}: {action}\n")
+            if action == "send_player_data":
+                self.update_and_send_players(data, client_address)
+            elif action == "logout":
+                self.handle_logout_udp(data, client_address)
 
-                if action == "send_player_data":
-                    self.update_and_send_players(data, client_address)
 
 
 
@@ -151,6 +156,34 @@ class Server:
         self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
         print("All players' data sent successfully via UDP.\n")
 
+    def handle_receive_stories(self, client_socket):
+        """
+        Handle the request for stories from the client using TCP.
+        """
+        print("Sending stories to client via TCP...\n")
+
+        # Retrieve data from database
+        titles, contents, usernames, pos_x, pos_y = self.json_data_base.receive_data()
+
+        # Create dictionary with the data
+        data = {
+            "titles": titles or [],
+            "contents": contents or [],
+            "usernames": usernames or [],
+            "pos_x": pos_x or [],
+            "pos_y": pos_y or []
+        }
+
+        # Convert to JSON string
+        json_data = json.dumps(data)
+
+        try:
+            # Send data through TCP socket
+            client_socket.send(json_data.encode('utf-8'))
+            print("Stories sent successfully.\n")
+        except Exception as e:
+            print(f"Error sending stories: {e}")
+
 
 
     def handle_client(self, client_socket, client_address):
@@ -170,6 +203,9 @@ class Server:
 
                 if action == 'login':
                     self.handle_login(client_socket)
+
+                elif action == 'receive_stories':
+                    self.handle_receive_stories(client_socket)
 
                 elif action == 'register':
                     self.handle_register(client_socket)
@@ -201,41 +237,7 @@ class Server:
         else:
             client_socket.send(b'False')  # Send failure response
 
-    def handle_receive_stories(self, client_address):
-        """
-        Handle the request for stories from the client using UDP.
-        """
-        try:
-            print("Sending stories to client via UDP...\n")
 
-            # Retrieve data from database
-            try:
-                titles, contents, usernames, pos_x, pos_y = self.json_data_base.receive_data()
-            except Exception as e:
-                print(f"Error retrieving data from database: {e}\n")
-                return
-
-            # Create dictionary with the data
-            data = {
-                "titles": titles or [],
-                "contents": contents or [],
-                "usernames": usernames or [],
-                "pos_x": pos_x or [],
-                "pos_y": pos_y or []
-            }
-
-            # Convert to JSON string
-            json_data = json.dumps(data)
-
-            # Send the data through UDP socket
-            self.udp_socket.sendto(json_data.encode('utf-8'), client_address)
-
-            print("Stories sent successfully via UDP.\n")
-
-        except socket.error as e:
-            print(f"Socket error: {e}\n")
-        except Exception as e:
-            print(f"Unexpected error: {e}\n")
 
     def handle_register(self, client_socket):
         """
@@ -287,28 +289,44 @@ class Server:
             username = client_socket.recv(1024).decode('utf-8')
             print(f"Logout request received for {username}\n")
 
+            # Handle logout logic here
+
+            # Send response back to the client
+            client_socket.send(b"Logout successful.")
+
+        except Exception as e:
+            print(f"Error during logout: {e}")
+            client_socket.send(b"Error during logout.")
+
+    def handle_logout_udp(self, data, client_address):
+        """
+        Handle client logout and remove the player from the players list.
+        """
+        try:
+            # Receive the username of the player who is logging out
+            username = data['username']
+            print(f"Logout request received for {username}\n")
+
             # Find the player in the list and remove them
             player_found = False
             for player in self.players:
                 if player.username == username:
                     self.players.remove(player)
                     player_found = True
+                    print(f"Player {username} removed from the players list.")
                     break
 
             if player_found:
-                print(f"Player {username} removed from the players list.\n")
-                client_socket.send(b'Logout successful, you have been removed from the players list.')
+                self.udp_socket.sendto(b'Logout successful, you have been removed from the players list.', client_address)
+
             else:
-                print(f"Player {username} not found in the players list.\n")
-                client_socket.send(b'Player not found, could not log out.')
+                self.udp_socket.sendto(b'Player not found, could not log out.', client_address)
 
         except Exception as e:
-            print(f"Error during logout: {e}\n")
-            client_socket.send(b"Error during logout.")
-        finally:
-            # Close the connection with the client
-            client_socket.close()
-            print(f"Client {username} logged out and connection closed.\n")
+            print(f"Error during logout: {e}")
+
+
+
 
 
 # Main entry point for the server

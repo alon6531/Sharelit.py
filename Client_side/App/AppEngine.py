@@ -176,7 +176,7 @@ class AppEngine:
         self.add_entity(self.player)
 
         # Load and display stories from the client
-        #self.load_stories()
+        self.load_stories()
 
     def load_stories(self):
         """Load and place stories on the map with specific positions"""
@@ -196,7 +196,7 @@ class AppEngine:
                               self.reverse_words_and_letters_in_text(f" מאת: {username}") + "\n"
                               + self.reverse_words_and_letters_in_text(title) + "\n"
                               + self.reverse_words_and_letters_in_text(content))
-                #self.add_entity(story)
+                self.add_entity(story)
 
         except Exception as e:
             print("Error while loading stories:", e)
@@ -221,7 +221,7 @@ class AppEngine:
             self.refresh_user = current_time
 
         if current_time - self.refresh_story >= 10000:  # 10 seconds
-            #self.load_stories()
+            self.load_stories()
             self.refresh_story = current_time
 
     def create_player(self):
