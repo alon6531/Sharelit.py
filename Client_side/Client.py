@@ -123,54 +123,45 @@ class Client:
         return titles, contents, usernames, pos_x, pos_y
 
     def send_player_data(self, pos_x, pos_y):
-        try:
-            # Send a message indicating that player data will be sent
-            self.udp_socket.sendto(b'send_player_data', (self.server_host, self.udp_port))
 
-            # Prepare the data to send (username, pos_x, pos_y)
-            player_data = {
-                "username": self.username,
-                "pos_x": pos_x,
-                "pos_y": pos_y
-            }
+        # Send a message indicating that player data will be sent
 
-            # Convert the data to JSON and send it to the server
-            data_to_send = json.dumps(player_data)
-            self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
-            print(f"Sent player data to server: {player_data}\n")
+        # Prepare the data to send (username, pos_x, pos_y)
+        player_data = {
+            "action": "send_player_data",
+            "username": self.username,
+            "pos_x": pos_x,
+            "pos_y": pos_y
+        }
 
-            # Wait for the server's response (list of all players)
-            data, _ = self.udp_socket.recvfrom(1024)
+        # Convert the data to JSON and send it to the server
+        data_to_send = json.dumps(player_data)
+        self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
+        print(f"Sent player data to server: {player_data}\n")
 
-            # Decode and parse the server's response safely
-            try:
-                response = json.loads(data.decode('utf-8'))
-            except json.JSONDecodeError:
-                print("Error: Failed to decode server response.")
-                return None, None  # Return None if JSON parsing fails
+        # Wait for the server's response (list of all players)
+        data, _ = self.udp_socket.recvfrom(1024)
 
-            # Assuming the response contains the number of players and the list of users
-            num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
-            print(f"Received server response: {response}")
+        # Decode and parse the server's response safely
 
-            # Extract players' information safely
-            users_db = response.get('players', [])
-            users = []
-            for user in users_db:
-                username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
-                pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
-                pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
-                print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
-                users.append(User(username, pos_x, pos_y))
+        response = json.loads(data.decode('utf-8'))
+        # Assuming the response contains the number of players and the list of users
+        num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
+        print(f"Received server response: {response}")
 
-            return num_players, users
+        # Extract players' information safely
+        users_db = response.get('players', [])
+        users = []
+        for user in users_db:
+            username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
+            pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
+            pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
+            print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
+            users.append(User(username, pos_x, pos_y))
 
-        except socket.error as e:
-            print(f"Socket error occurred: {e}")
-            return None, None  # Return None if there's a socket-related error
-        except Exception as e:
-            print(f"Unexpected error occurred: {e}")
-            return None, None  # Return None for any other unexpected error
+        return num_players, users
+
+
 
     def logout(self):
         try:
@@ -182,7 +173,7 @@ class Client:
         except Exception as e:
             print(f"Error during logout: {e}")
         finally:
-            self.client_socket.close()
+            self.udp_socket.close()
             print("Disconnected from server.")
 
     def get_user(self):

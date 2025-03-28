@@ -225,33 +225,47 @@ class AppEngine:
             self.refresh_story = current_time
 
     def create_player(self):
-        num_of_players, users = self.client.send_player_data(self.player.x, self.player.y)
-        print(num_of_players)
-        # First, remove entities that are no longer in the users list
-        usernames_in_users = [user.username for user in users]
-        self.entities = [entity for entity in self.entities if
-                         not (isinstance(entity, Others) and entity.username not in usernames_in_users)]
+        try:
+            # Send player data and receive the number of players and their details
+            num_of_players, users = self.client.send_player_data(self.player.x, self.player.y)
+            print(f"Number of players: {num_of_players}")
 
-        if num_of_players > 1:
-            for user in users:
-                if user.username != self.client.username:
-                    print(user.print_all_users())
+            if not users:  # Check if the list of users is empty or invalid
+                print("Warning: No players found in the user list.")
+                return  # Early exit if no users are present
 
-                    found = False  # Flag indicating whether the player already exists
+            # First, remove entities that are no longer in the users list
+            usernames_in_users = [user.username for user in users]
+            self.entities = [entity for entity in self.entities if
+                             not (isinstance(entity, Others) and entity.username not in usernames_in_users)]
 
-                    for entity in self.entities:
-                        if isinstance(entity, Others) and entity.username == user.username:
-                            print(f"Updating {user.username}: pos_x={user.pos_x}, pos_y={user.pos_y}")
-                            entity.x = user.pos_x
-                            entity.y = user.pos_y
-                            found = True
-                            break
+            if num_of_players > 1:
+                for user in users:
+                    if not hasattr(user, 'username') or not hasattr(user, 'pos_x') or not hasattr(user, 'pos_y'):
+                        print(f"Warning: Invalid user data found for {user}. Skipping.")
+                        continue  # Skip this user if they don't have the expected properties
 
-                    if not found:
-                        other = Others(self.player.get_rect().x, self.player.get_rect().y, user.username)
-                        self.entities.append(other)
-                        print("Added new player:", user.username)
+                    if user.username != self.client.username:
+                        print(f"User {user.username} at position ({user.pos_x}, {user.pos_y})")
 
+                        found = False  # Flag indicating whether the player already exists
+
+                        for entity in self.entities:
+                            if isinstance(entity, Others) and entity.username == user.username:
+                                print(f"Updating {user.username}: pos_x={user.pos_x}, pos_y={user.pos_y}")
+                                entity.x = user.pos_x
+                                entity.y = user.pos_y
+                                found = True
+                                break
+
+                        if not found:
+                            # Add new player to the entities list
+                            other = Others(self.player.get_rect().x, self.player.get_rect().y, user.username)
+                            self.entities.append(other)
+                            print(f"Added new player: {user.username}")
+
+        except Exception as e:
+            print(f"Error in create_player: {e}")
 
 
 

@@ -91,38 +91,67 @@ class Server:
         """
         Listen for incoming UDP messages and handle them.
         """
-        try:
-            time.sleep(0.1)  # Adding a small delay of 100ms
-            while True:
-                try:
-                    # Receive data from the socket
-                    data, client_address = self.udp_socket.recvfrom(1024)
-                    message = data.decode('utf-8')
 
-                    print(f"Received UDP message from {client_address}: {message}\n")
+        time.sleep(0.1)  # Adding a small delay of 100ms
+        while True:
 
-                    if message == "send_player_data":
-                        self.update_and_send_players(client_address)
+                # Receive data from the socket
+                massage, client_address = self.udp_socket.recvfrom(1024)
+                data = json.loads(massage.decode('utf-8'))
+                action = data['action']
 
-                except UnicodeDecodeError:
-                    print("Error: Failed to decode incoming message.")
-                    continue  # Skip this iteration and continue listening for the next message
-                except socket.error as e:
-                    print(f"Socket error occurred: {e}")
-                    break  # Break the loop if a socket error occurs
-                except Exception as e:
-                    print(f"Unexpected error occurred while handling client {client_address}: {e}")
-                    continue  # Continue listening for the next message after handling the error
 
-        except Exception as e:
-            print(f"Error in UDP listening loop: {e}")
+                print(f"Received UDP message from {client_address}: {action}\n")
 
-        finally:
-            try:
-                self.udp_socket.close()
-                print(f"Closed connection\n")
-            except Exception as e:
-                print(f"Error closing socket: {e}")
+                if action == "send_player_data":
+                    self.update_and_send_players(data, client_address)
+
+
+
+    def update_and_send_players(self, data, client_address):
+        """
+        Receive player data from a client (username, pos_x, pos_y) and send all players' information via UDP.
+        """
+
+
+        if not data:  # Check if the data is empty
+            print("Received empty data, ignoring...")
+            return  # Ignore if data is empty
+
+
+        # Extract player info safely with validation
+        username = data.get("username")
+        pos_x = data.get("pos_x")
+        pos_y = data.get("pos_y")
+
+        print(f"Received via UDP -> username: {username}, x: {pos_x}, y: {pos_y}\n")
+
+        # Update or add the player to the list
+        player_updated = False
+        for player in self.players:
+            if player.username == username:
+                player.pos_x = pos_x
+                player.pos_y = pos_y
+                player_updated = True
+                print(f"Updated existing player: {username} with new position.")
+                break
+
+        if not player_updated:
+            self.players.append(User(username, pos_x, pos_y))
+            print(f"Added new player: {username}")
+
+        # Prepare and send all players' information to the client
+        players_data = {
+            "num_players": len(self.players),
+            "players": [{"username": player.username, "pos_x": player.pos_x, "pos_y": player.pos_y} for player in
+                        self.players]
+        }
+        # Convert the players data to a JSON string and send it via UDP
+        data_to_send = json.dumps(players_data)
+        self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
+        print("All players' data sent successfully via UDP.\n")
+
+
 
     def handle_client(self, client_socket, client_address):
         """
@@ -280,74 +309,6 @@ class Server:
             # Close the connection with the client
             client_socket.close()
             print(f"Client {username} logged out and connection closed.\n")
-
-    def update_and_send_players(self, client_address):
-        """
-        Receive player data from a client (username, pos_x, pos_y) and send all players' information via UDP.
-        """
-        try:
-            # Receive the player's update (username, pos_x, pos_y)
-            data, _ = self.udp_socket.recvfrom(1024)
-
-            if not data:  # Check if the data is empty
-                raise ValueError("Received empty data")
-
-            try:
-                player_data = json.loads(data.decode('utf-8'))
-            except json.JSONDecodeError as e:
-                print(f"Error decoding JSON from client {client_address}: {e}")
-                error_message = json.dumps({"status": "error", "message": "Invalid JSON format"})
-                self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
-                return  # Exit the function after sending the error message
-
-            # Extract player info safely
-            username = player_data.get("username")
-            pos_x = player_data.get("pos_x")
-            pos_y = player_data.get("pos_y")
-
-            if not username or pos_x is None or pos_y is None:
-                raise ValueError("Missing player data (username, pos_x, or pos_y)")
-
-            print(f"Received via UDP -> username: {username}, x: {pos_x}, y: {pos_y}\n")
-
-            # Update or add the player to the list
-            player_updated = False
-            for player in self.players:
-                if player.username == username:
-                    player.pos_x = pos_x
-                    player.pos_y = pos_y
-                    player_updated = True
-                    break
-
-            if not player_updated:
-                self.players.append(User(username, pos_x, pos_y))
-
-            # Prepare and send all players' information to the client
-            players_data = {
-                "num_players": len(self.players),
-                "players": [{"username": player.username, "pos_x": player.pos_x, "pos_y": player.pos_y} for player in
-                            self.players]
-            }
-
-            # Convert to JSON string and send the data
-            data_to_send = json.dumps(players_data)
-            self.udp_socket.sendto(data_to_send.encode('utf-8'), client_address)
-            print("All players' data sent successfully via UDP.\n")
-
-        except ValueError as e:
-            print(f"Value error while updating player data: {e}")
-            error_message = json.dumps({"status": "error", "message": str(e)})
-            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
-
-        except socket.error as e:
-            print(f"Socket error occurred: {e}")
-            error_message = json.dumps({"status": "error", "message": "Socket error"})
-            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
-
-        except Exception as e:
-            print(f"Unexpected error while updating and sending players' data: {e}")
-            error_message = json.dumps({"status": "error", "message": str(e)})
-            self.udp_socket.sendto(error_message.encode('utf-8'), client_address)
 
 
 # Main entry point for the server
