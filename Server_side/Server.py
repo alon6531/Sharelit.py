@@ -117,8 +117,6 @@ class Server:
         """
         Receive player data from a client (username, pos_x, pos_y) and send all players' information via UDP.
         """
-
-
         if not data:  # Check if the data is empty
             print("Received empty data, ignoring...")
             return  # Ignore if data is empty

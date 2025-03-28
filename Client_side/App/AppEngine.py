@@ -283,7 +283,7 @@ class AppEngine:
             self.bStart = False
 
         try:
-            while self.running:
+            while self.running and self.client.running:
                 self.handle_events()
                 self.update()
                 self.collide_handle(self.entities)

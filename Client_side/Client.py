@@ -19,7 +19,7 @@ class Client:
         self.server_host = server_host
         self.tcp_port = tcp_port
         self.udp_port = udp_port
-
+        self.running = False
         # Generate RSA keys
         self.private_key, self.public_key = self.make_keys()
         self.public_key_pem = self.public_key.public_bytes(
@@ -79,6 +79,7 @@ class Client:
             if response == 'True':
                 print("Login successful!")
                 self.username = login_username
+                self.running = True
                 return True
             else:
                 print("Login failed!")
@@ -86,6 +87,9 @@ class Client:
         except Exception as e:
             print(f"Error during login: {e}")
             return False
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Server connection lost: {e}")
+            self.cleanup_and_disconnect()
 
     def register(self, user_name, username, password):
         try:
@@ -97,78 +101,87 @@ class Client:
             print(response)
         except Exception as e:
             print(f"Error during registration: {e}")
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Server connection lost: {e}")
+            self.cleanup_and_disconnect()
 
     def receive_stories(self):
+        try:
+            # Send request to receive stories
+            self.client_socket.send(b'receive_stories')
+            response = self.client_socket.recv(1024).decode('utf-8')
 
-        # Send request to receive stories
-        self.client_socket.send(b'receive_stories')
-        response = self.client_socket.recv(1024).decode('utf-8')
-
-        # Receive data from server
-
-
-        data = self.client_socket.recv(4096)
+            # Receive data from server
 
 
-        # Decode and parse JSON
-        json_data = data.decode('utf-8')
-        stories_data = json.loads(json_data)
+            data = self.client_socket.recv(4096)
 
-        # Extract data into arrays
-        titles = stories_data.get('titles', [])
-        contents = stories_data.get('contents', [])
-        usernames = stories_data.get('usernames', [])
-        pos_x = stories_data.get('pos_x', [])
-        pos_y = stories_data.get('pos_y', [])
 
-        # Print received data
-        print("Received titles:", titles)
-        print("Received contents:", contents)
-        print("Received usernames:", usernames)
-        print("Received pos_x:", pos_x)
-        print("Received pos_y:", pos_y)
+            # Decode and parse JSON
+            json_data = data.decode('utf-8')
+            stories_data = json.loads(json_data)
 
-        # Return extracted data
-        return titles, contents, usernames, pos_x, pos_y
+            # Extract data into arrays
+            titles = stories_data.get('titles', [])
+            contents = stories_data.get('contents', [])
+            usernames = stories_data.get('usernames', [])
+            pos_x = stories_data.get('pos_x', [])
+            pos_y = stories_data.get('pos_y', [])
+
+            # Print received data
+            print("Received titles:", titles)
+            print("Received contents:", contents)
+            print("Received usernames:", usernames)
+            print("Received pos_x:", pos_x)
+            print("Received pos_y:", pos_y)
+
+            # Return extracted data
+            return titles, contents, usernames, pos_x, pos_y
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Server connection lost: {e}")
+            self.cleanup_and_disconnect()
 
     def send_player_data(self, pos_x, pos_y):
 
         # Send a message indicating that player data will be sent
+        try:
+            # Prepare the data to send (username, pos_x, pos_y)
+            player_data = {
+                "action": "send_player_data",
+                "username": self.username,
+                "pos_x": pos_x,
+                "pos_y": pos_y
+            }
 
-        # Prepare the data to send (username, pos_x, pos_y)
-        player_data = {
-            "action": "send_player_data",
-            "username": self.username,
-            "pos_x": pos_x,
-            "pos_y": pos_y
-        }
+            # Convert the data to JSON and send it to the server
+            data_to_send = json.dumps(player_data)
+            self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
+            print(f"Sent player data to server: {player_data}\n")
 
-        # Convert the data to JSON and send it to the server
-        data_to_send = json.dumps(player_data)
-        self.udp_socket.sendto(data_to_send.encode('utf-8'), (self.server_host, self.udp_port))
-        print(f"Sent player data to server: {player_data}\n")
+            # Wait for the server's response (list of all players)
+            data, _ = self.udp_socket.recvfrom(1024)
 
-        # Wait for the server's response (list of all players)
-        data, _ = self.udp_socket.recvfrom(1024)
+            # Decode and parse the server's response safely
 
-        # Decode and parse the server's response safely
+            response = json.loads(data.decode('utf-8'))
+            # Assuming the response contains the number of players and the list of users
+            num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
+            print(f"Received server response: {response}")
 
-        response = json.loads(data.decode('utf-8'))
-        # Assuming the response contains the number of players and the list of users
-        num_players = response.get('num_players', 0)  # Default to 0 if 'num_players' is not in the response
-        print(f"Received server response: {response}")
+            # Extract players' information safely
+            users_db = response.get('players', [])
+            users = []
+            for user in users_db:
+                username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
+                pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
+                pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
+                print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
+                users.append(User(username, pos_x, pos_y))
 
-        # Extract players' information safely
-        users_db = response.get('players', [])
-        users = []
-        for user in users_db:
-            username = user.get('username', 'Unknown')  # Default to 'Unknown' if username is not found
-            pos_x = user.get('pos_x', 0)  # Default to 0 if pos_x is not found
-            pos_y = user.get('pos_y', 0)  # Default to 0 if pos_y is not found
-            print(f"Username: {username}, Position: ({pos_x}, {pos_y})")
-            users.append(User(username, pos_x, pos_y))
-
-        return num_players, users
+            return num_players, users
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Server connection lost: {e}")
+            self.cleanup_and_disconnect()
 
     def logout(self):
         try:
@@ -193,6 +206,9 @@ class Client:
             print(response)
         except Exception as e:
             print(f"Error during logout: {e}")
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Server connection lost: {e}")
+            self.cleanup_and_disconnect()
         finally:
             # Close the UDP socket and TCP socket
             self.udp_socket.close()
@@ -218,7 +234,24 @@ class Client:
             print(response)
         except Exception as e:
             print(f"Error adding story: {e}")
+        except (socket.error, ConnectionResetError) as e:
+            print(f"Server connection lost: {e}")
+            self.cleanup_and_disconnect()
 
+    def cleanup_and_disconnect(self):
+        try:
+            self.running = False
+            # Send a logout message if possible (to notify the server)
+            if self.username:
+                self.logout()
+
+            # Close both TCP and UDP sockets
+            self.client_socket.close()
+            self.udp_socket.close()
+            print("Client disconnected and resources cleaned up.")
+            exit()
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
 
 # Main entry point
 if __name__ == "__main__":
