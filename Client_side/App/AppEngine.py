@@ -208,7 +208,7 @@ class AppEngine:
         print("Game is starting...")
 
         # Load the map
-        map_entity = Map(-1920 * 2, -1080 * 2, 1920 * 5, 1080 * 5, "../assets/map.png")
+        map_entity = Map(-2920  , -2580,  6530, 9796, "../assets/map.png")
         self.add_entity(map_entity)
         # Create the plus button and player
         add_story_b = Button("add_story", self.width/ 2, self.height - 60, 100, 100, (29, 64, 99), (70, 130, 180), "+", 100 / 2, 0, 75)
